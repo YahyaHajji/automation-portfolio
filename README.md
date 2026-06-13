@@ -21,7 +21,6 @@ Practical business automations built with Make.com and AI services.
 automation-portfolio/
 |-- README.md
 |-- LICENSE
-|-- linkedin-post.md
 `-- projects/
     `-- ai-email-draft-assistant/
         |-- README.md
