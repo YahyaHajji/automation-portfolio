@@ -1,0 +1,139 @@
+{
+  "name": "agent_accueil",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "message"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4b4cfb64-cc8e-4028-8bf8-0c7e5583640a",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "options": {
+          "systemMessage": "Tu es l'assistant officiel d'accueil de l'UPF.\nPour repondre a une question, suis EXACTEMENT ces etapes :\n\nETAPE 1 - Lire le document approprie selon le sujet :\n- Question generale (horaires, inscriptions, contacts) -> read_file avec path = \"C:\\path\\to\\documents\"\n- Question sur reglement -> read_file avec path = \"C:\\path\\to\\documents\"\n\nETAPE 2 - Repondre en francais en citant le fichier source.\n\nREGLE ABSOLUE : tu DOIS toujours passer le parametre \"path\" avec un chemin absolu complet.\n\nCONTACTS UTILES :\n- Scolarite : contact@example.com\n- Direction : contact@example.com\n\nSi la question n'est dans aucun document : reponds \"Pour cette information, contactez contact@example.com\".",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "b44291f9-f6ab-4985-80e2-7099f0fa16f7",
+      "name": "AI Agent",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        80,
+        208
+      ],
+      "id": "7ebacb51-e137-45c3-9e2e-5acc23a7755b",
+      "name": "Groq Chat Model"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId || 'default-session' }}",
+        "contextWindowLength": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        208
+      ],
+      "id": "36516042-4f34-4eb7-95c1-c1ca93cac549",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://YOUR_MCP_SERVER:PORT/sse",
+        "serverTransport": "sse",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        208
+      ],
+      "id": "dafa1dd6-fdea-498b-9d7d-e1bc979a6a37",
+      "name": "MCP Client"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Client": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

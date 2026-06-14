@@ -1,12 +1,16 @@
 # Automation Portfolio
 
-Practical business automations built with Make.com and AI services.
+Practical business automations built with Make.com, n8n, and AI services.
 
 ## Projects
 
 | Project | What it does | Tools |
 | --- | --- | --- |
 | [AI Email Draft Assistant](projects/ai-email-draft-assistant/) | Watches Gmail, generates a professional reply with Gemini, and saves it as a draft for human review. | Make.com, Gmail, Gemini 2.5 Flash |
+| [Smart UPF Multi-Agent System](projects/smart-upf-multi-agent-system/) | Routes university questions to five specialist AI agents for academic, planning, reception, PFE, and website information. | n8n, Groq, MCP |
+| [RAG Customer Support Chatbot](projects/chatbot-rag/) | Answers support questions from indexed documentation with retrieval, memory, authentication checks, and rate limiting. | n8n, Groq, Pinecone, Ollama |
+| [Documentation Indexing Pipeline](projects/documentation-indexing/) | Extracts, chunks, embeds, and indexes documents for semantic retrieval. | n8n, Pinecone, Ollama |
+| [Customer Support Chatbot](projects/customer-support-chatbot/) | Provides scoped ecommerce support with conversation memory and clear escalation boundaries. | n8n, Groq |
 
 ## Portfolio Principles
 
@@ -22,13 +26,13 @@ automation-portfolio/
 |-- README.md
 |-- LICENSE
 `-- projects/
-    `-- ai-email-draft-assistant/
-        |-- README.md
-        |-- blueprint/
-        |-- diagrams/
-        `-- screenshots/
+    |-- ai-email-draft-assistant/
+    |-- smart-upf-multi-agent-system/
+    |-- chatbot-rag/
+    |-- documentation-indexing/
+    `-- customer-support-chatbot/
 ```
 
 ## Security
 
-Connection identifiers and personal email addresses have been removed from the published blueprint. After importing it into Make.com, configure your own Gmail and Gemini connections before running the scenario.
+Connection identifiers, credentials, local paths, private contact details, and instance-specific workflow IDs are removed from published exports. Configure your own services after import.

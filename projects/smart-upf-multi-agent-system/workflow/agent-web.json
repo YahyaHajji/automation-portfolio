@@ -1,0 +1,167 @@
+{
+  "name": "agent_web",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "message"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5e952fc8-cd47-49c1-af78-772487351a50",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "url": "https://example.edu",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "627ed297-58ac-4f85-b6e7-3b66f0cca44f",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=={{ $json.message }}",
+        "options": {
+          "systemMessage": "Tu es l'agent Web de l'UPF. Tu reponds aux questions sur les formations,\nadmissions et frais en analysant le contenu du site officiel.\n\nCONTENU DU SITE UPF (texte extrait) :\n={{ $json.siteContent }}\n\nINFORMATIONS CLES TROUVEES DANS LE SITE :\n- Etablissements : FSI, Medecine Dentaire, Sciences Paramedicales, ESMAB,\n  Fes Business School, Campus Rabat, Sciences Po, Centre Doctoral\n- Diplomes : Licences, Masters, Ingenieur d Etat, ENCG, Doctorats\n- Admissions : conditions acces, procedures admission, grille tarifaire,\n  bourses de merites\n- Contact : contact@example.com | +212 535 610 320\n- Adresse : Lotissement Quaraouiyine Route Ain Chkef, Fes 30000\n\nPROCEDURE :\n1. Analyse le contenu du site fourni\n2. Reponds en francais avec les informations trouvees\n3. Si absent : \"Consultez www.upf.ac.ma ou contactez contact@example.com\"\n\nReponds toujours en francais. Sois precis et concis.",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "dc363c0f-9add-47bd-8c77-144d3198641a",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        288,
+        208
+      ],
+      "id": "32f7427b-4557-45e9-b884-f390fe0c5432",
+      "name": "Groq Chat Model"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId || \"default-session\" }}",
+        "contextWindowLength": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        432,
+        208
+      ],
+      "id": "e1d3058e-939a-4d63-a10a-cfe3960d3115",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data || '';\n\n// Strip script and style blocks entirely\nlet text = html\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')        // remove all HTML tags\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&eacute;/g, 'é')\n  .replace(/&egrave;/g, 'è')\n  .replace(/&agrave;/g, 'à')\n  .replace(/&amp;/g, '&')\n  .replace(/\\r?\\n|\\r/g, ' ')       // flatten newlines\n  .replace(/\\s{2,}/g, ' ')         // collapse whitespace\n  .trim();\n\n// Truncate to ~6000 chars to stay within token limits\ntext = text.substring(0, 6000);\n\nreturn [{ json: { \n  message: $('When Executed by Another Workflow').first().json.message,\n  siteContent: text \n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "eb804104-d5c5-458f-a54d-f6d0cf307a29",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

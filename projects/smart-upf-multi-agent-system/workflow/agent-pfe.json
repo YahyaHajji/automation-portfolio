@@ -1,0 +1,138 @@
+{
+  "name": "agent_pfe",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "message"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "65304b0e-7432-479c-8a98-e26fb2fa4fc5",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "options": {
+          "systemMessage": "Tu es l'agent PFE de l'UPF.\n\nOUTIL UNIQUE DISPONIBLE : read_text_file\nSIGNATURE EXACTE : read_text_file(path)\n\nAPPEL CORRECT — copie exactement :\n{\n  \"path\": \"C:\\path\\to\\documents\"\n}\n\nINTERDIT : ne jamais ajouter \"tool\", \"id\", \"head\", ou tout autre parametre.\nLe seul parametre autorise est \"path\". Tout autre champ provoque une erreur.\n\nPROCEDURE :\n1. Appelle read_text_file avec uniquement le parametre path\n2. Lis le contenu retourne\n3. Reponds en francais en citant les informations trouvees\n\nSUJETS COUVERTS :\n- Calendrier : choix sujet 15 nov, depot 1er juin, soutenances juin-juillet\n- Structure rapport : 4 chapitres, page de garde, conclusion, annexes\n- Evaluation : rapport 40%, soutenance 40%, suivi 20%, minimum 12/20\n- Sujets IA : Dr Karim, Dr Sara, Dr Amine\n- Sujets Web : Dr Amine, Prof Rachid\n- Securite : Dr Karim, Prof Hassan\n- Depot : 3 exemplaires papier + PDF + ZIP, limite 1er juin 2026 17h00\n- Contact : contact@example.com | Bureau A105 | Lundi-Vendredi 9h-16h\n\nSi absent du guide : \"Contactez contact@example.com\"",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "02e98704-019d-4da5-a3b8-fe0d8a473fb1",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        80,
+        208
+      ],
+      "id": "c8743955-4413-4203-867d-b859e2ea6422",
+      "name": "Groq Chat Model"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId || \"default-session\" }}",
+        "contextWindowLength": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        208
+      ],
+      "id": "44a33643-c7bc-4721-8909-41692c90e3d1",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://YOUR_MCP_SERVER:PORT/sse",
+        "serverTransport": "sse",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.2,
+      "position": [
+        480,
+        224
+      ],
+      "id": "bfa2a2f8-771d-40c5-94b5-33038e6d208f",
+      "name": "MCP Client"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Client": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

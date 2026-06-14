@@ -1,0 +1,130 @@
+{
+  "name": "Chatbot Support Client",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Bonjour ! Je suis votre assistant support. Comment puis-je vous aider ?",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7d28a938-6c26-4c64-b61e-550f4212da9e",
+      "name": "When chat message received"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "# IDENTITE\nTu es ShopBot, l'assistant support de BoutiqueEnLigne.\n\n# ROLE\nTu aides les clients avec :\n- Questions sur les produits\n- Informations de livraison\n- Processus de commande\n- Retours et remboursements\n\n# CONNAISSANCES\n\n## LIVRAISON\n- France métropolitaine : 3-5 jours, 4.90 euros\n- Gratuite dès 50 euros d'achat\n- Europe : 7-10 jours, 9.90 euros\n- International : 15-20 jours, 19.90 euros\n\n## RETOURS\n- Délai : 30 jours après réception\n- Produits en parfait état uniquement\n- Frais de retour : à la charge du client\n- Remboursement sous 7 jours\n\n## CONTACT\n- Email : contact@example.com\n- Tel : 01 23 45 67 89\n- Horaires : Lun-Ven 9h-18h\n\n# INSTRUCTIONS\n1. Salue chaleureusement le client\n2. Pose des questions de clarification si nécessaire\n3. Fournis des informations précises\n4. Propose le contact humain pour cas complexes\n5. Termine toujours avec \"Autre chose ?\"\n\n# CONTRAINTES\n- Ne traite pas les informations de paiement\n- N'accède pas aux comptes clients\n- Ne modifie pas les commandes\n- Reste UNIQUEMENT dans ton domaine d'expertise\n- Si tu ne sais pas, dis-le honnêtement"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "710c628f-94c5-4098-a99d-76035e660b0d",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {
+          "maxTokensToSample": 500,
+          "temperature": 0.6
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        80,
+        208
+      ],
+      "id": "079878d8-0903-40a5-a9c3-9c3eac67befe",
+      "name": "Groq Chat Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recuperer les donnees d'entree\nconst inputData = $input.first().json;\n\n// Generer ou recuperer un session ID\nconst sessionId = inputData.sessionId || \n                  inputData.chatId || \n                  `session-${Date.now()}`;\n\n// Retourner les donnees avec session ID\nreturn [{\n  json: {\n    ...inputData,\n    sessionId: sessionId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "a333b723-49a6-4e7a-8893-f5f994d6aab0",
+      "name": "Session ID"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Session ID').item.json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        432,
+        208
+      ],
+      "id": "46a45553-ab81-4286-b5b3-041294afbcd9",
+      "name": "Simple Memory"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Session ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session ID": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": false
+}
