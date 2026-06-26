@@ -7,6 +7,7 @@ Practical business automations built with Make.com, n8n, and AI services.
 | Project | What it does | Tools |
 | --- | --- | --- |
 | [AI Email Draft Assistant](projects/ai-email-draft-assistant/) | Watches Gmail, generates a professional reply with Gemini, and saves it as a draft for human review. | Make.com, Gmail, Gemini 2.5 Flash |
+| [Smart UPF Multi-Agent Assistant](projects/smart-upf-multi-agent-assistant/) | Handles university questions with specialist agents, Redis caching, PostgreSQL logging, supervisor validation, and Grafana dashboards. | n8n, Ollama, Redis, PostgreSQL, Grafana |
 | [Smart UPF Multi-Agent System](projects/smart-upf-multi-agent-system/) | Routes university questions to five specialist AI agents for academic, planning, reception, PFE, and website information. | n8n, Groq, MCP |
 | [RAG Customer Support Chatbot](projects/chatbot-rag/) | Answers support questions from indexed documentation with retrieval, memory, authentication checks, and rate limiting. | n8n, Groq, Pinecone, Ollama |
 | [Documentation Indexing Pipeline](projects/documentation-indexing/) | Extracts, chunks, embeds, and indexes documents for semantic retrieval. | n8n, Pinecone, Ollama |
@@ -27,6 +28,7 @@ automation-portfolio/
 |-- LICENSE
 `-- projects/
     |-- ai-email-draft-assistant/
+    |-- smart-upf-multi-agent-assistant/
     |-- smart-upf-multi-agent-system/
     |-- chatbot-rag/
     |-- documentation-indexing/
