@@ -1,0 +1,51 @@
+﻿{
+  "name": "agent_accueil",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        688,
+        16
+      ],
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst message = String(\n  input.message ||\n  input.user_message ||\n  input.chatInput ||\n  ''\n);\n\nconst q = message\n  .toLowerCase()\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '');\n\nlet output = '';\n\nif (/(horaire|horaires|ouverture|ouvre|ferme)/.test(q)) {\n  output = `\nLes horaires d'ouverture de l'UPF sont :\n\n- Lundi à vendredi : 8h00 - 17h00\n- Samedi : 9h00 - 13h00\n- Dimanche : fermé\n\nSource : faq-upf.md.\n`.trim();\n} else if (/(inscription|documents|administrative|dossier)/.test(q)) {\n  output = `\nPour l'inscription, les documents requis sont :\n\n- CIN\n- Baccalauréat\n- Photos\n- Fiche de renseignement\n\nLa date limite pour L1 est le 15 septembre 2026.\n\nSource : faq-upf.md.\n`.trim();\n} else if (/(contact|scolarite|direction|email)/.test(q)) {\n  output = `\nContacts utiles :\n\n- Scolarité : scolarite@upf.ma\n- Direction : direction@upf.ma\n- Filière Informatique : info@upf.ma\n\nSource : faq-upf.md.\n`.trim();\n} else if (/(examen|examens|notes|rattrapage)/.test(q)) {\n  output = `\nInformations sur les examens :\n\n- Session normale : janvier pour S1 et juin pour S2\n- Session de rattrapage : juillet\n- Accès aux notes : portail.upf.ma\n\nSource : faq-upf.md.\n`.trim();\n} else {\n  output = `\nCette information ne figure pas dans les documents disponibles. Contactez scolarite@upf.ma.\n\nSource : faq-upf.md.\n`.trim();\n}\n\nreturn [{ json: { output, message } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        16
+      ],
+      "name": "Build Accueil Answer"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Build Accueil Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "xqCorjwT6LtpA4B5",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

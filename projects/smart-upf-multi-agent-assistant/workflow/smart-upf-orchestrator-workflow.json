@@ -1,0 +1,1092 @@
+﻿{
+  "name": "Smart UPF — Orchestrateur",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Salut 👋 Je suis l'agent Smart UPF. Comment je peux aider?",
+        "options": {
+          "loadPreviousSession": "notSupported",
+          "title": "Salut 👋 Je suis l'agent Smart UPF. Comment je peux aider?"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "name": "Chat Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const requestId = 'req-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);\nconst sessionId = $json.sessionId || 'default-session';\nconst userMessage = $json.chatInput || '';\nconst startedAt = new Date().toISOString();\n\nconst normalizedMessage = userMessage\n  .toLowerCase()\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '')\n  .replace(/[^a-z0-9 ]/g, '')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nconst cacheKey = normalizedMessage.replace(/\\s/g, '_').substring(0, 120);\n\nreturn {\n  chatInput: userMessage,\n  sessionId,\n  requestId,\n  startedAt,\n  cacheKey,\n\n  // pass to utility_log_event\n  session_id: sessionId,\n  request_id: requestId,\n  user_message: userMessage,\n  status: 'pending',\n  selected_agent: '',\n  final_response: '',\n  duration_ms: 0\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "name": "Prepare Request Context"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "cachedResponse",
+        "key": "={{ \"smartupf:cache:\" + $json.cacheKey }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "name": "Redis Lookup Cached Answer"
+    },
+    {
+      "parameters": {
+        "jsCode": "const initial = $('Prepare Request Context').item.json;\nconst redisResult = $input.first().json;\n\nreturn [{\n  json: {\n    ...initial,\n    cachedResponse:\n      redisResult.cachedResponse ||\n      redisResult.propertyName ||\n      redisResult.value ||\n      null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "name": "Merge Cache With Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.cachedResponse }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        832,
+        0
+      ],
+      "name": "Is Cached Answer Available?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('Merge Cache With Request').item.json;\nconst logResult = $input.first().json;\n\nlet cached = original.cachedResponse;\n\ntry {\n  if (typeof cached === 'string') {\n    cached = JSON.parse(cached);\n  }\n} catch (error) {\n  cached = {\n    finalResponse: String(original.cachedResponse || ''),\n    selectedAgent: 'cache'\n  };\n}\n\nif (!cached || typeof cached !== 'object') {\n  cached = {\n    finalResponse: String(original.cachedResponse || ''),\n    selectedAgent: 'cache'\n  };\n}\n\nconst finalResponse =\n  cached.finalResponse ||\n  cached.final_response ||\n  cached.output ||\n  '';\n\nconst selectedAgent =\n  cached.selectedAgent ||\n  cached.selected_agent ||\n  original.selected_agent ||\n  'cache';\n\nconst completedAt = new Date().toISOString();\nconst started = new Date(original.startedAt || original.started_at || Date.now()).getTime();\nconst durationMs = Date.now() - started;\n\nreturn [{\n  json: {\n    ...original,\n    ...logResult,\n    requestId: original.requestId || original.request_id,\n    request_id: original.request_id || original.requestId,\n    selectedAgent,\n    selected_agent: selectedAgent,\n    finalResponse,\n    final_response: finalResponse,\n    status: 'completed',\n    completedAt,\n    completed_at: completedAt,\n    durationMs,\n    duration_ms: durationMs,\n    from_cache: true,\n    output: finalResponse\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -240
+      ],
+      "name": "Build Cached Response"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "mvBVKt9ZQeHYcXWF",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/mvBVKt9ZQeHYcXWF",
+          "cachedResultName": "utility_log_event"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        0
+      ],
+      "name": "Log Request Pending"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "mvBVKt9ZQeHYcXWF",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/mvBVKt9ZQeHYcXWF",
+          "cachedResultName": "utility_log_event"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1312,
+        -240
+      ],
+      "name": "Log Cached Request Pending"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Prepare Request Context').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "Tu es l'Orchestrateur de Smart UPF, le centre de routage de l'Université Privée de Fès.\n\nRÔLE UNIQUE\nTu analyses la question de l'utilisateur, sélectionnes le sous-agent compétent et l'appelles.\n\nTu ne réponds jamais directement à la question.\nTu dois toujours appeler exactement un sous-agent.\nAprès son exécution, transmets fidèlement sa réponse sans ajouter, supprimer ou inventer d'informations.\n\nAGENTS DISPONIBLES\n\n1. agent_pedagogique\nCours, exercices, SQL, PostgreSQL, bases de données, algorithmique,\nprogrammation, React Native, code et explication de concepts techniques.\n\n2. agent_planning\nEmplois du temps, horaires de cours, salles, amphithéâtres, examens,\névénements planifiés et soutenances programmées.\n\n3. agent_accueil\nFAQ générale, horaires d'ouverture, contacts administratifs,\ninscriptions administratives et règlement intérieur.\n\n4. agent_pfe\nGuide PFE, sujets PFE, encadrants PFE, rapport PFE, dépôt,\névaluation, calendrier PFE et soutenance PFE.\n\n5. agent_web\nFormations, filières, établissements, admissions, frais de scolarité,\nbourses, campus, vie étudiante et informations publiques du site UPF.\n\nORDRE DE PRIORITÉ\n\nApplique les règles dans l'ordre suivant. La première règle précise qui correspond détermine l'agent.\n\n1. CONTENU PÉDAGOGIQUE\n\nSi la question concerne un cours, un exercice, du code, SQL, PostgreSQL,\nune jointure, React Native, l'algorithmique, la programmation ou\nl'explication d'un concept technique :\n\n→ appelle agent_pedagogique\n\n2. PFE\n\nSi la question mentionne explicitement PFE, rapport PFE, sujet PFE,\nguide PFE, encadrant PFE, dépôt PFE, évaluation PFE, calendrier PFE\nou soutenance PFE :\n\n→ appelle agent_pfe\n\nCette règle est prioritaire sur la règle générale des soutenances et calendriers.\n\n3. PLANNING\n\nSi la question concerne un emploi du temps, une salle, un amphithéâtre,\nun examen, un horaire de cours, une réservation de salle, une salle libre\nou occupée, un événement planifié ou la soutenance d'une personne :\n\n→ appelle agent_planning\n\nUne question contenant seulement \"soutenance\", sans mention explicite de PFE,\nest envoyée à agent_planning.\n\n4. SITE WEB ET OFFRE ACADÉMIQUE\n\nSi la question concerne les formations, filières, diplômes, établissements,\nadmissions, conditions d'accès, frais de scolarité, bourses, campus,\nvie étudiante ou le site officiel de l'UPF :\n\n→ appelle agent_web\n\n5. ACCUEIL\n\nSi la question concerne les horaires d'ouverture, les contacts administratifs,\nla FAQ, le règlement intérieur ou une démarche administrative générale :\n\n→ appelle agent_accueil\n\n6. CAS PAR DÉFAUT\n\nSi aucune règle ne correspond clairement :\n\n→ appelle agent_accueil\n\nRÈGLES DE DÉSAMBIGUÏSATION\n\nLe mot \"disponible\" ne détermine jamais l'agent à lui seul.\nAnalyse toujours le sujet auquel il se rapporte :\n\n- \"salle disponible\" → agent_planning\n- \"amphi disponible\" → agent_planning\n- \"formation disponible\" → agent_web\n- \"filière disponible\" → agent_web\n- \"sujet PFE disponible\" → agent_pfe\n\nLe mot \"horaire\" dépend également du contexte :\n\n- \"horaires d'ouverture de l'UPF\" → agent_accueil\n- \"horaire de cours\" → agent_planning\n- \"horaire d'un examen\" → agent_planning\n- \"horaire d'une soutenance\" → agent_planning\n\nLe mot \"inscription\" dépend du contexte :\n\n- inscription administrative ou document d'inscription → agent_accueil\n- admission à une formation, conditions d'accès ou candidature → agent_web\n\nLes frais de scolarité, tarifs et bourses sont toujours envoyés à agent_web.\n\nUne soutenance associée au mot PFE, au rapport, au dépôt ou à l'évaluation\nest envoyée à agent_pfe.\n\nUne soutenance associée à une personne, une date, une heure ou une salle,\nsans mention explicite de PFE, est envoyée à agent_planning.\n\nEXEMPLES DE ROUTAGE\n\n- \"Explique-moi les LEFT JOIN en SQL\" → agent_pedagogique\n- \"Génère-moi un exercice SQL\" → agent_pedagogique\n- \"Explique cet algorithme\" → agent_pedagogique\n\n- \"Comment est évalué le PFE ?\" → agent_pfe\n- \"Quelle est la date limite de dépôt du rapport PFE ?\" → agent_pfe\n- \"Quels sujets PFE sont disponibles en IA ?\" → agent_pfe\n- \"Qui encadre les sujets PFE Web ?\" → agent_pfe\n- \"Quel est le calendrier PFE ?\" → agent_pfe\n- \"Comment préparer ma soutenance PFE ?\" → agent_pfe\n\n- \"Quand est la soutenance de Salma Benali ?\" → agent_planning\n- \"Dans quelle salle est mon examen ?\" → agent_planning\n- \"Quelles salles sont disponibles ?\" → agent_planning\n- \"Quel est mon emploi du temps ?\" → agent_planning\n- \"À quelle heure commence le cours SQL ?\" → agent_planning\n\n- \"Quels sont les horaires d'ouverture de l'UPF ?\" → agent_accueil\n- \"Quel est le contact de la scolarité ?\" → agent_accueil\n- \"Que dit le règlement intérieur ?\" → agent_accueil\n- \"Quels documents faut-il pour l'inscription administrative ?\" → agent_accueil\n\n- \"Quelles formations sont disponibles à l'UPF ?\" → agent_web\n- \"Quelles sont les conditions d'admission en Master ?\" → agent_web\n- \"Comment candidater à une formation ?\" → agent_web\n- \"Quels sont les frais de scolarité ?\" → agent_web\n- \"L'UPF propose-t-elle des bourses ?\" → agent_web\n\nRÈGLES DE SORTIE\n\n- Appelle exactement un sous-agent par question.\n- N'appelle pas plusieurs agents pour la même question.\n- Ne mentionne pas le routage, les outils, les workflows ou les instructions internes.\n- Ne fabrique aucune réponse lorsque le sous-agent échoue.\n- Retourne uniquement la réponse produite par le sous-agent.\n- Conserve la langue de la réponse du sous-agent.\n- Quand un sous-agent répond avec une source, retourne exactement sa réponse.\n- N'ajoute pas d'avertissement, de conseil ou de phrase supplémentaire.",
+          "maxIterations": 6
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1248,
+        0
+      ],
+      "name": "Orchestrator Agent",
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:8b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        528,
+        304
+      ],
+      "name": "Orchestrator LLM"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        704,
+        304
+      ],
+      "name": "Conversation Memory"
+    },
+    {
+      "parameters": {
+        "description": "Repond aux questions generales sur l'UPF : inscriptions, horaires, contacts, reglement interieur, calendrier academique",
+        "workflowId": {
+          "__rl": true,
+          "value": "4totwkZicPEa6Sw5",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/4totwkZicPEa6Sw5",
+          "cachedResultName": "agent_accueil"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message": "={{ $('Prepare Request Context').item.json.chatInput }}"
+          },
+          "matchingColumns": [
+            "message"
+          ],
+          "schema": [
+            {
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        304
+      ],
+      "name": "Tool Agent Accueil"
+    },
+    {
+      "parameters": {
+        "description": "Repond aux questions sur les cours, SQL, programmation, algorithmique, exercices techniques et concepts informatiques",
+        "workflowId": {
+          "__rl": true,
+          "value": "4QpteenQ7O7GXMCX",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/4QpteenQ7O7GXMCX",
+          "cachedResultName": "agent_pedagogique"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message": "={{ $('Prepare Request Context').item.json.chatInput }}"
+          },
+          "matchingColumns": [
+            "message"
+          ],
+          "schema": [
+            {
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        288
+      ],
+      "name": "Tool Agent Pedagogique"
+    },
+    {
+      "parameters": {
+        "description": "Repond aux questions sur le planning, emploi du temps, salles, soutenances, examens et calendrier academique",
+        "workflowId": {
+          "__rl": true,
+          "value": "gQpoRiqd0aFh3RRQ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/gQpoRiqd0aFh3RRQ",
+          "cachedResultName": "agent_planning"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message": "={{ $('Prepare Request Context').item.json.chatInput }}"
+          },
+          "matchingColumns": [
+            "message"
+          ],
+          "schema": [
+            {
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        288
+      ],
+      "name": "Tool Agent Planning"
+    },
+    {
+      "parameters": {
+        "description": "Repond aux questions sur le PFE : calendrier, structure rapport,\nevaluation, sujets disponibles, regles de depot",
+        "workflowId": {
+          "__rl": true,
+          "value": "Uucm2mGg8DOr8rG4",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Uucm2mGg8DOr8rG4",
+          "cachedResultName": "agent_pfe"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message": "={{ $('Prepare Request Context').item.json.chatInput }}"
+          },
+          "matchingColumns": [
+            "message"
+          ],
+          "schema": [
+            {
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1376,
+        288
+      ],
+      "name": "Tool Agent PFE"
+    },
+    {
+      "parameters": {
+        "description": "Repond aux questions sur les formations UPF, admissions, frais de\nscolarite, filières disponibles en consultant le site officiel upf.ac.ma",
+        "workflowId": {
+          "__rl": true,
+          "value": "wVlQeefd7KK31zlW",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/wVlQeefd7KK31zlW",
+          "cachedResultName": "agent_web"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message": "={{ $('Prepare Request Context').item.json.chatInput }}"
+          },
+          "matchingColumns": [
+            "message"
+          ],
+          "schema": [
+            {
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1536,
+        288
+      ],
+      "name": "Tool Agent Web"
+    },
+    {
+      "parameters": {
+        "jsCode": "const initial = $('Prepare Request Context').item.json;\nconst agentOutput = String($input.first().json.output || '');\n\nconst userMessage = String(\n  initial.userMessage ||\n  initial.user_message ||\n  initial.chatInput ||\n  initial.message ||\n  ''\n);\n\nconst text = userMessage\n  .toLowerCase()\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '');\n\nlet selectedAgent = 'agent_accueil';\n\n// Specific accueil rules must precede \"scolarite\" and admissions rules.\nif (/\\b(horaires?\\s+d'ouverture|contacts?\\s+de\\s+la\\s+scolarite|contact\\s+scolarite|reglement|absences?|inscription\\s+administrative|documents?\\s+d'inscription)\\b/.test(text)) {\n  selectedAgent = 'agent_accueil';\n} else if (/\\b(sql|postgresql|jointures?|joins?|algorithmique|algorithmes?|react\\s+native|programmation|codes?|exercices?)\\b/.test(text)) {\n  selectedAgent = 'agent_pedagogique';\n} else if (/\\b(pfe|rapport\\s+pfe|sujets?\\s+pfe|guide\\s+pfe|encadrants?\\s+pfe|depot\\s+du\\s+rapport)\\b/.test(text)) {\n  selectedAgent = 'agent_pfe';\n} else if (/\\b(plannings?|emplois?\\s+du\\s+temps|salles?|amphis?|amphitheatres?|examens?|calendriers?|soutenances?|horaires?\\s+de\\s+cours)\\b/.test(text)) {\n  selectedAgent = 'agent_planning';\n} else if (/\\b(formations?|filieres?|diplomes?|admissions?|candidater|candidature|masters?|frais|bourses?|campus|etablissements?|vie\\s+etudiante)\\b/.test(text)) {\n  selectedAgent = 'agent_web';\n}\n\nreturn [{\n  json: {\n    requestId: initial.requestId || initial.request_id || '',\n    sessionId: initial.sessionId || initial.session_id || '',\n    userMessage,\n    agentResponse: agentOutput,\n    selectedAgent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "name": "Prepare Supervisor Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.agentResponse }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1808,
+        0
+      ],
+      "name": "Is Response Successful?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "iAXV3sn0IVuTaPQa",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/iAXV3sn0IVuTaPQa",
+          "cachedResultName": "agent_supervisor"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2016,
+        -80
+      ],
+      "name": "Run Supervisor Evaluation"
+    },
+    {
+      "parameters": {
+        "jsCode": "const supervisor = $input.first().json;\nconst action = supervisor.action || 'accept';\nconst agentResponse = $('Prepare Supervisor Input').item.json.agentResponse || '';\nconst improvedResponse = supervisor.improvedResponse || '';\nconst startedAt = $('Prepare Request Context').item.json.startedAt || '';\n\nlet finalResponse = '';\nif (action === 'accept') {\n  finalResponse = agentResponse;\n} else if (action === 'rewrite' && improvedResponse) {\n  finalResponse = improvedResponse;\n} else if (action === 'human_review') {\n  finalResponse = \"Je suis désolé, je ne dispose pas d'informations suffisantes pour répondre à cette question. Veuillez contacter l'administration de l'UPF directement.\";\n} else {\n  finalResponse = agentResponse || \"Je suis désolé, une erreur est survenue. Veuillez réessayer.\";\n}\n\nconst completedAt = new Date().toISOString();\nconst durationMs = startedAt ? Math.round(new Date(completedAt) - new Date(startedAt)) : 0;\n\nreturn [{\n  json: {\n    output: finalResponse,\n    action,\n    approved: supervisor.approved,\n    score: supervisor.score,\n    // analytics fields\n    requestId: $('Prepare Request Context').item.json.requestId,\n    selectedAgent: $('Prepare Supervisor Input').item.json.selectedAgent || 'unknown',\n    finalResponse,\n    completedAt,\n    durationMs,\n    status: 'completed'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2256,
+        -80
+      ],
+      "name": "Prepare Successful DB Update"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ \"smartupf:cache:\" + $('Prepare Request Context').item.json.cacheKey }}",
+        "value": "={{ JSON.stringify({   finalResponse: $json.finalResponse || $json.output || '',   selectedAgent: $json.selectedAgent || $json.selected_agent || '' }) }}",
+        "expire": true,
+        "ttl": 600
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2496,
+        -80
+      ],
+      "name": "Redis Store Successful Answer"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "smartupf_messages",
+          "mode": "list",
+          "cachedResultName": "smartupf_messages"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "final_response": "={{ $json.finalResponse }}",
+            "selected_agent": "={{ $json.selectedAgent }}",
+            "completed_at": "={{ $json.completedAt }}",
+            "duration_ms": "={{ $json.durationMs }}",
+            "status": "={{ $json.status }}",
+            "request_id": "={{ $json.requestId }}"
+          },
+          "matchingColumns": [
+            "request_id"
+          ],
+          "schema": [
+            {
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "session_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "displayName": "request_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "displayName": "user_message",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "displayName": "final_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "selected_agent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "started_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "displayName": "completed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "duration_ms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2672,
+        -240
+      ],
+      "name": "Mark Request Completed"
+    },
+    {
+      "parameters": {
+        "jsCode": "let data = $input.first().json;\n\nif (!data.output && data.finalResponse) {\n  data.output = data.finalResponse;\n}\n\nif (!data.output) {\n  try {\n    data = $('Prepare Successful DB Update').item.json;\n  } catch (error) {\n    data = $('Build Cached Response').item.json;\n  }\n}\n\nreturn [{\n  json: {\n    output: data.output || data.finalResponse || data.final_response || ''\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2896,
+        -240
+      ],
+      "name": "Return Final Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const initial = $('Prepare Request Context').item.json;\n\nlet selectedAgent = 'unknown';\n\ntry {\n  const classified = $('Prepare Supervisor Input').item.json;\n  selectedAgent =\n    classified.selectedAgent ||\n    classified.selected_agent ||\n    classified.agent ||\n    'unknown';\n} catch (error) {\n  const userMessage = String(\n    initial.userMessage ||\n    initial.user_message ||\n    initial.message ||\n    initial.chatInput ||\n    ''\n  )\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n\n  if (/\\b(sql|postgresql|jointures?|joins?|algorithmique|algorithmes?|react\\s+native|programmation|codes?|exercices?)\\b/.test(userMessage)) {\n    selectedAgent = 'agent_pedagogique';\n  } else if (/\\b(pfe|rapport\\s+pfe|sujets?\\s+pfe|guide\\s+pfe|encadrants?\\s+pfe|depot\\s+du\\s+rapport)\\b/.test(userMessage)) {\n    selectedAgent = 'agent_pfe';\n  } else if (/\\b(plannings?|emplois?\\s+du\\s+temps|salles?|amphis?|amphitheatres?|examens?|calendriers?|soutenances?|horaires?\\s+de\\s+cours)\\b/.test(userMessage)) {\n    selectedAgent = 'agent_planning';\n  } else if (/\\b(formations?|filieres?|diplomes?|admissions?|candidater|candidature|masters?|frais|scolarite|bourses?|campus|etablissements?|vie\\s+etudiante)\\b/.test(userMessage)) {\n    selectedAgent = 'agent_web';\n  } else {\n    selectedAgent = 'agent_accueil';\n  }\n}\n\nreturn [{\n  json: {\n    requestId: initial.requestId || initial.request_id || '',\n    userMessage: initial.userMessage || initial.user_message || initial.message || initial.chatInput || '',\n    selectedAgent,\n    output: \"Je suis désolé, le service reçoit actuellement trop de demandes ou rencontre une indisponibilité temporaire. Veuillez réessayer dans quelques instants.\",\n    status: 'failed',\n    completedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        176
+      ],
+      "name": "Build Failure Response"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "smartupf_messages",
+          "mode": "list",
+          "cachedResultName": "smartupf_messages"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}",
+            "completed_at": "={{ $json.completedAt }}",
+            "final_response": "={{ $json.output }}",
+            "request_id": "={{ $json.requestId }}",
+            "selected_agent": "={{ $json.selectedAgent }}"
+          },
+          "matchingColumns": [
+            "request_id"
+          ],
+          "schema": [
+            {
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "displayName": "session_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "displayName": "request_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "displayName": "user_message",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "displayName": "final_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "selected_agent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "started_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "displayName": "completed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "displayName": "duration_ms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2208,
+        176
+      ],
+      "name": "Mark Request Failed"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $('Build Failure Response').item.json;\n\nreturn [{\n  json: {\n    output: result.output\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        176
+      ],
+      "name": "Return Failure Response"
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Request Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Request Context": {
+      "main": [
+        [
+          {
+            "node": "Redis Lookup Cached Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Lookup Cached Answer": {
+      "main": [
+        [
+          {
+            "node": "Merge Cache With Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Cache With Request": {
+      "main": [
+        [
+          {
+            "node": "Is Cached Answer Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Cached Answer Available?": {
+      "main": [
+        [
+          {
+            "node": "Log Cached Request Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Request Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Cached Response": {
+      "main": [
+        [
+          {
+            "node": "Mark Request Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Request Pending": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Cached Request Pending": {
+      "main": [
+        [
+          {
+            "node": "Build Cached Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator Agent": {
+      "main": [
+        [
+          {
+            "node": "Prepare Supervisor Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator LLM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool Agent Accueil": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool Agent Pedagogique": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool Agent Planning": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool Agent PFE": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool Agent Web": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Supervisor Input": {
+      "main": [
+        [
+          {
+            "node": "Is Response Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Response Successful?": {
+      "main": [
+        [
+          {
+            "node": "Run Supervisor Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Failure Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Supervisor Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Prepare Successful DB Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Successful DB Update": {
+      "main": [
+        [
+          {
+            "node": "Redis Store Successful Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Store Successful Answer": {
+      "main": [
+        [
+          {
+            "node": "Mark Request Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Request Completed": {
+      "main": [
+        [
+          {
+            "node": "Return Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Failure Response": {
+      "main": [
+        [
+          {
+            "node": "Mark Request Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Request Failed": {
+      "main": [
+        [
+          {
+            "node": "Return Failure Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "xqCorjwT6LtpA4B5"
+  }
+}

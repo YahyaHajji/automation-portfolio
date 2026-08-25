@@ -1,0 +1,130 @@
+﻿{
+  "name": "agent_planning",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message || $json.user_message || $json.chatInput }}",
+        "options": {
+          "systemMessage": "Tu es l'agent Planning de l'UPF.\n\nDOMAINE\nTu réponds aux questions concernant :\n- les emplois du temps ;\n- les salles ;\n- les examens ;\n- les soutenances ;\n- le calendrier académique.\n\nOUTIL AUTORISÉ\nUtilise read_text_file.\n\nAppel exact :\n{\"path\":\"C:/Users/yahya/Desktop/UPF/smartupf/docs/agenda-upf.json\"}\n\nLe seul paramètre autorisé est \"path\".\nN'ajoute jamais \"tool\", \"id\", \"name\", \"head\" ou un autre paramètre.\n\nPROCÉDURE\n1. Lis obligatoirement agenda-upf.json.\n2. Analyse le tableau \"evenements\".\n3. Recherche les événements correspondant à la question.\n4. Réponds uniquement avec les informations présentes dans le fichier.\n\nRÈGLES\n- Réponds toujours en français.\n- Pour un événement trouvé, indique le titre, la date, l'heure et la salle.\n- Ne fabrique aucune date, heure, salle ou personne.\n- Si aucun événement ne correspond, dis clairement qu'aucune information n'a été trouvée.\n- Si la question est vague, par exemple \"Quand est ma soutenance ?\" ou \"Dans quelle salle est mon examen ?\", cherche les événements pertinents.\n- Si plusieurs événements correspondent ou si l'utilisateur n'a pas donné assez d'informations, demande une précision au lieu d'inventer.\n- Ne mentionne jamais le nom du fichier agenda-upf.json à l'utilisateur.\n- Si une précision est nécessaire, demande simplement à l'utilisateur de préciser le module, la date, la salle ou la personne concernée.\n- Pour plus de détails, précisez le module, la date, la salle ou la personne concernée.\n- Si la question contient le nom d'une personne et qu'aucun événement ne correspond exactement à ce nom, réponds clairement qu'aucune soutenance n'a été trouvée pour cette personne. Ne demande pas le module sauf si plusieurs événements correspondent.",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        208,
+        0
+      ],
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId || 'default-session' }}",
+        "contextWindowLength": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        208
+      ],
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://host.docker.internal:3002/sse",
+        "serverTransport": "sse",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.2,
+      "position": [
+        352,
+        208
+      ],
+      "name": "MCP Client"
+    },
+    {
+      "parameters": {
+        "model": "qwen2.5:3b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        80,
+        208
+      ],
+      "name": "Ollama Chat Model"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Client": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "xqCorjwT6LtpA4B5",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
